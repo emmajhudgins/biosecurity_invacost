@@ -4,6 +4,9 @@ library(dplyr)
 library(rvest)
 library(reshape2)
 library(mgcv)
+library(visreg)
+library(ggplot2)
+
 
 dam<-read.csv('./data/damag.ex.or.csv')
 mg<-read.csv('./data/manag.ex.or.csv')
@@ -39,7 +42,7 @@ colnames(combined)[c(4)]<-c( "damage_cost")
 
 ##add additional predictors
 combined<-merge(combined, sr_tab, 'code', all.x=T)
-socioeco_dat<-readRDS('./data/soc_econ_country.rds') # From Sardain, Leung et al. Nature Sustainability
+socioeco_dat<-readRDS('./data/soc_econ_country.rds') # From Sardain, Leung et al. Nature Sustainability, GDP and population are already log transformed
 socioeco_dat<-subset(socioeco_dat, yr==2014)
 socioeco_dat<-subset(socioeco_dat, IHS.i%in%countrycode(unique(combined$code), 'iso3c', 'country.name'))
 socioeco_dat<-subset(socioeco_dat, IHS.j%in%countrycode(unique(combined$code), 'iso3c', 'country.name'))
@@ -91,7 +94,7 @@ combined$mgmt_year[which(is.infinite(combined$mgmt_year))]<-2017
 
 ##matched data
 stwist_merge<-merge(combined, stwist_match, c('code', 'Species'), all.x=T)
-stwist_merge$mgmt_delay<-stwist_merge$TenYear.y-stwist_merge$mgmt_year # time since management began (can be negative)
+stwist_merge$mgmt_delay<-stwist_merge$TenYear.x-stwist_merge$mgmt_year # time since management began (can be negative)
 stwist_sum<-stwist_merge%>%group_by(code, TenYear.x)%>%summarize_at("mgmt_delay",mean, na.rm=T)                    
 
 combined2<-merge(combined, stwist_cont, by=c("code", "TenYear"), all.x=T)
@@ -135,22 +138,51 @@ combined4<-merge(combined4, n_refs_mg, all.x=T)
 combined4$mg_ref[which(is.na(combined4$mg_ref))]<-0
 combined4$cum_species_fn1[which(is.na(combined4$cum_species_fn1))]<-0
 
-combined5<-combined4
-combined5$damage_ref[which(is.na(combined5$damage_ref))]<-0
 combined4<-combined4[which(combined4$damage_cost>0),]
-m<-gam(log(combined5$damage_cost+1)~log(combined5$Knowledge+1)+log(combined5$pre_inv+1)+log(combined5$post_inv+1)+log(combined5$cum_species_fn1+1)+log(combined5$tot_sr_fn1+1)+s(combined5$TenYear, k=5)+log(combined5$imports+1)+log(combined5$imports_historical+1)+(combined5$GDP.j+1)+(combined5$Pop.j+1)+combined5$mgmt_delay_fn1+log(combined5$damage_ref+1))
+combined4$GDP.j<-exp(combined4$GDP.j)
+combined4$Pop.j<-exp(combined4$Pop.j)
+
+m<-gam(log(damage_cost+1)~log(Knowledge+1)+log(pre_inv+1)+log(post_inv+1)+log(cum_species_fn1+1)+log(tot_sr_fn1+1)+s(TenYear, k=5)+log(imports+1)+log(imports_historical+1)+log(GDP.j+1)+log(Pop.j+1)+s(mgmt_delay_fn1,k=5)+log(damage_ref+1), select=T, method="GCV.Cp", data=combined4)
 (sum_m<-summary(m))
 write.csv(sum_m$p.table,file="damage_results.csv")
 write.csv(sum_m$s.table,file="damage_results_smooth.csv")
 
-combined5$mgmt_spend<-combined5$pre_inv+combined5$post_inv
+combined4$mgmt_spend<-combined4$pre_inv+combined4$post_inv
 
 
 
-m2<-gam(log(combined5$mgmt_spend+1)~log(combined5$pre_inv+1)+log(combined5$Knowledge+1)+log(combined5$damage_cost+1)+log(combined5$cum_species_fn1+1)+log(combined5$imports+1)+log(combined5$imports_historical+1)+(combined5$GDP.j+1)+log(combined5$Pop.j+1)+combined5$mgmt_delay_fn1+log(combined5$tot_sr_fn1+1)+log(combined5$mg_ref+1)+s(combined5$TenYear, k=5))
+m2<-gam(log(mgmt_spend+1)~log(pre_inv+1)+log(Knowledge+1)+log(damage_cost+1)+log(cum_species_fn1+1)+log(imports+1)+log(imports_historical+1)+log(GDP.j+1)+log(Pop.j+1)+s(mgmt_delay_fn1, k=5)+log(tot_sr_fn1+1)+log(mg_ref+1)+s(TenYear, k=5), select=T, method="GCV.Cp", data=combined4)
 (sum_m2<-summary(m2))
 
 write.csv(sum_m2$p.table,file="mg_results.csv")
 write.csv(sum_m2$s.table,file="mg_results_smooth.csv")
 
-    
+
+###plotting
+
+#GAM
+gam.check(m)
+plot(m, all.terms = FALSE, ylab="TenYear", rug=TRUE, shade= TRUE, shade.col = "lightblue", seWithMean = TRUE, shift = coef(m)[1], residuals=TRUE)
+plot(m, all.terms = FALSE, ylab="TenYear", rug=TRUE, shade= TRUE, shade.col = "lightblue", seWithMean = TRUE, shift = coef(m)[1], residuals=TRUE)
+
+T4 <-visreg(m,  scale='response',"TenYear", line.par = list(col = 'black'), plot=TRUE, data=combined4,xlab="Decade", ylab="log(Damage cost+1)")
+T5 <-visreg(m, scale='response', "damage_ref", line.par = list(col = 'black'), plot=TRUE,xlab="Number of damage cost references", ylab="log(Damage cost+1)")
+T6 <-visreg(m,scale='response',"post_inv", line.par = list(col = 'black'), plot=TRUE,xlab="Post-invasion management spending", ylab="log(Damage cost+1)")
+T7 <-visreg(m, scale='response', "Pop.j", line.par = list(col = 'black'), plot=TRUE,xlab="Population", ylab="log(Damage cost+1)")
+
+
+##management plotting
+gam.check(m2)
+plot(m2, all.terms = FALSE, ylab="TenYear", rug=TRUE, shade= TRUE, shade.col = "lightblue", seWithMean = TRUE, shift = coef(m)[1], residuals=TRUE)
+plot(m2, all.terms = FALSE, ylab="TenYear", rug=TRUE, shade= TRUE, shade.col = "lightblue", seWithMean = TRUE, shift = coef(m)[1], residuals=TRUE)
+
+T8 <-visreg(m2,  scale='response',"TenYear", line.par = list(col = 'black'), plot=TRUE, data=combined4,xlab="Decade", ylab="log(Management cost+1)")
+T9 <-visreg(m2, scale='response', "mg_ref", line.par = list(col = 'black'), plot=TRUE,xlab="Number of management cost references", ylab="log(Management cost+1)")
+T10 <-visreg(m2,scale='response',"pre_inv", line.par = list(col = 'black'), plot=TRUE,xlab="Pre-invasion management spending", ylab="log(Management cost+1)")
+T11 <-visreg(m, scale='response', "Pop.j", line.par = list(col = 'black'), plot=TRUE,xlab="Damage cost spending", ylab="log(Management cost+1)")
+
+
+
+
+
+
