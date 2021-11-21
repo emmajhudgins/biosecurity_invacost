@@ -181,8 +181,9 @@ T9 <-visreg(m2, scale='response', "mg_ref", line.par = list(col = 'black'), plot
 T10 <-visreg(m2,scale='response',"pre_inv", line.par = list(col = 'black'), plot=TRUE,xlab="Pre-invasion management spending", ylab="log(Management cost+1)")
 T11 <-visreg(m, scale='response', "Pop.j", line.par = list(col = 'black'), plot=TRUE,xlab="Damage cost spending", ylab="log(Management cost+1)")
 
-
-
-
+hist(combined4$mgmt_delay_fn1, xlab="Mean management delay across countries and decades", main=NULL)
+abline(v=0, col='red', lty=2)
+plot(combined4$mgmt_delay_fn1~combined4$TenYear, xlab='Time', ylab="Management delay (years)", pch=19, col='darkgrey')
+abline(h=0, col='red', lty=2)
 
 
