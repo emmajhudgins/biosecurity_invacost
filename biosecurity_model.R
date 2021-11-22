@@ -186,4 +186,9 @@ abline(v=0, col='red', lty=2)
 plot(combined4$mgmt_delay_fn1~combined4$TenYear, xlab='Time', ylab="Management delay (years)", pch=19, col='darkgrey')
 abline(h=0, col='red', lty=2)
 
-
+overall_delay<-combined3%>%group_by(code)%>%summarize_if(is.numeric, min, na.rm=T)
+plot(overall_delay$mgmt_delay~overall_delay$TenYear)
+hist(overall_delay$mgmt_delay)
+mean(overall_delay$mgmt_delay)
+summary(lm(overall_delay$mgmt_delay~overall_delay$TenYear)
+)
