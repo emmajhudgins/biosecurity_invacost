@@ -87,10 +87,10 @@ combined$mgmt_year<-0
 
 for (i in 1:nrow(combined))
 {
-  relevant<-subset(combined, Species==combined$Species[i]&(combined$`Pre-invasion management`!=0|combined$`Post-invasion management`!=0))
+  relevant<-subset(combined, (Species==combined$Species[i]&(combined$`Pre-invasion management`!=0|combined$`Post-invasion management`!=0)& code==combined$code[i]))
   combined$mgmt_year[i]<-min(relevant$TenYear, na.rm=T)
 }
-combined$mgmt_year[which(is.infinite(combined$mgmt_year))]<-2017
+combined$mgmt_year[which(is.infinite(combined$mgmt_year))]<-2020
 
 ##matched data
 stwist_merge<-merge(combined, stwist_match, c('code', 'Species'), all.x=T)
@@ -113,7 +113,7 @@ combined4$post_inv<-combined4$`Post-invasion management_fn2`
 combined4$Knowledge[which(is.na(combined4$Knowledge)==T)]<-0
 combined4$pre_inv[which(is.na(combined4$pre_inv)==T)]<-0
 combined4$post_inv[which(is.na(combined4$post_inv)==T)]<-0
-combined4$mgmt_delay_fn1[which(is.na(combined4$mgmt_delay_fn1))]<-combined4$TenYear[which(is.na(combined4$mgmt_delay_fn1))]-2017 # if management hadn't happened by 2017, take the delay from that year
+combined4$mgmt_delay_fn1[which(is.na(combined4$mgmt_delay_fn1))]<-combined4$TenYear[which(is.na(combined4$mgmt_delay_fn1))]-2020 # if management hadn't happened by 2020, take the delay from that year
 
 combined4<-merge(combined4, trade, by="code", all.x=T)
 combined4<-merge(combined4, trade_historical, by="code", all.x=T)
@@ -127,7 +127,7 @@ combined4$imports_historical[which(is.na(combined4$imports_historical))]<-0
 combined4$imports_historical<-as.numeric(combined4$imports_historical)
 combined4$GDP.j[which(is.na(combined4$GDP.j)==T)]<-mean(combined4$GDP.j, na.rm=T)
 combined4$Pop.j[which(is.na(combined4$Pop.j)==T)]<-mean(combined4$Pop.j, na.rm=T)
-combined4$mgmt_delay_fn1[which(is.infinite(combined4$mgmt_delay_fn1))]<-combined4$TenYear[which(is.infinite(combined4$mgmt_delay_fn1))]-2017
+combined4$mgmt_delay_fn1[which(is.infinite(combined4$mgmt_delay_fn1))]<-combined4$TenYear[which(is.infinite(combined4$mgmt_delay_fn1))]-2020
 combined4$tot_sr_fn1[which(is.na(combined4$tot_sr_fn1))]<-0
 n_refs_dam$damage_ref<-n_refs_dam$Reference_ID
 n_refs_dam<-n_refs_dam[,-(3)]
@@ -143,6 +143,7 @@ combined4$GDP.j<-exp(combined4$GDP.j)
 combined4$Pop.j<-exp(combined4$Pop.j)
 
 m<-gam(log(damage_cost+1)~log(Knowledge+1)+log(pre_inv+1)+log(post_inv+1)+log(cum_species_fn1+1)+log(tot_sr_fn1+1)+s(TenYear, k=5)+log(imports+1)+log(imports_historical+1)+log(GDP.j+1)+log(Pop.j+1)+s(mgmt_delay_fn1,k=5)+log(damage_ref+1), select=T, method="GCV.Cp", data=combined4)
+m<-gam(log(damage_cost+1)~log(Knowledge+1)+log(pre_inv+1)+log(post_inv+1)+log(cum_species_fn1+1)+log(tot_sr_fn1+1)+s(TenYear, k=5)+log(imports+1)+log(imports_historical+1)+log(Pop.j+1)+s(mgmt_delay_fn1,k=5)+log(damage_ref+1), select=T, method="GCV.Cp", data=combined4)
 (sum_m<-summary(m))
 write.csv(sum_m$p.table,file="damage_results.csv")
 write.csv(sum_m$s.table,file="damage_results_smooth.csv")
@@ -152,6 +153,7 @@ combined4$mgmt_spend<-combined4$pre_inv+combined4$post_inv
 
 
 m2<-gam(log(mgmt_spend+1)~log(pre_inv+1)+log(Knowledge+1)+log(damage_cost+1)+log(cum_species_fn1+1)+log(imports+1)+log(imports_historical+1)+log(GDP.j+1)+log(Pop.j+1)+s(mgmt_delay_fn1, k=5)+log(tot_sr_fn1+1)+log(mg_ref+1)+s(TenYear, k=5), select=T, method="GCV.Cp", data=combined4)
+m2<-gam(log(mgmt_spend+1)~log(pre_inv+1)+log(Knowledge+1)+log(damage_cost+1)+log(cum_species_fn1+1)+log(imports+1)+log(imports_historical+1)+log(Pop.j+1)+s(mgmt_delay_fn1, k=5)+log(tot_sr_fn1+1)+log(mg_ref+1)+s(TenYear, k=5), select=T, method="GCV.Cp", data=combined4)
 (sum_m2<-summary(m2))
 
 write.csv(sum_m2$p.table,file="mg_results.csv")
@@ -181,14 +183,25 @@ T9 <-visreg(m2, scale='response', "mg_ref", line.par = list(col = 'black'), plot
 T10 <-visreg(m2,scale='response',"pre_inv", line.par = list(col = 'black'), plot=TRUE,xlab="Pre-invasion management spending", ylab="log(Management cost+1)")
 T11 <-visreg(m, scale='response', "Pop.j", line.par = list(col = 'black'), plot=TRUE,xlab="Damage cost spending", ylab="log(Management cost+1)")
 
-hist(combined4$mgmt_delay_fn1, xlab="Mean management delay across countries and decades", main=NULL)
-abline(v=0, col='red', lty=2)
-plot(combined4$mgmt_delay_fn1~combined4$TenYear, xlab='Time', ylab="Management delay (years)", pch=19, col='darkgrey')
-abline(h=0, col='red', lty=2)
 
-overall_delay<-combined3%>%group_by(code)%>%summarize_if(is.numeric, min, na.rm=T)
-plot(overall_delay$mgmt_delay~overall_delay$TenYear)
+combined<-merge(dam, mg, by=c("Species", "code", "Impact_year"), all=T)
+combined<-combined%>%group_by(Species, code, Impact_year, Management_type.y)%>%summarize_if(is.numeric, min)
+combined$mgmt_year<-0
+for (i in 1:nrow(combined))
+{
+  relevant<-subset(combined, Species==combined$Species[i]&(combined$Management_type.y=='Pre-invasion management'|combined$Management_type.y=='Post-invasion management')&code==combined$code[i])
+  combined$mgmt_year[i]<-min(relevant$Impact_year, na.rm=T)
+}
+combined$mgmt_year[which(is.infinite(combined$mgmt_year))]<-2020
+combined<-subset(combined,is.na(Management_type.y)==T)
+overall_delay<-combined%>%group_by(code)%>%summarize_if(is.numeric, min, na.rm=T)
+overall_delay$mgmt_delay<-overall_delay$mgmt_year-overall_delay$Impact_year
+##e.g. if fist damage cost is 1992 (impact year) and first management was 1985, we would get -7. 
+plot(overall_delay$mgmt_delay~overall_delay$Impact_year)
 hist(overall_delay$mgmt_delay)
 mean(overall_delay$mgmt_delay)
-summary(lm(overall_delay$mgmt_delay~overall_delay$TenYear)
-)
+summary(lm(overall_delay$mgmt_delay~overall_delay$Impact_year))
+
+concurvity(m)
+concurvity(m2)
+cor(cbind((combined4$Knowledge+1),log(combined4$pre_inv+1),log(combined4$post_inv+1),log(combined4$cum_species_fn1+1),log(combined4$tot_sr_fn1+1),log(combined4$imports+1),log(combined4$imports_historical+1),log(combined4$GDP.j+1),log(combined4$Pop.j+1),log(combined4$damage_ref+1)))
