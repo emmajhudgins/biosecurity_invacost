@@ -194,14 +194,14 @@ for (i in 1:nrow(combined))
 }
 combined$mgmt_year[which(is.infinite(combined$mgmt_year))]<-2020
 combined<-subset(combined,is.na(Management_type.y)==T)
-overall_delay<-combined%>%group_by(code)%>%summarize_if(is.numeric, min, na.rm=T)
+overall_delay<-combined%>%group_by(Species,code)%>%summarize_if(is.numeric, min, na.rm=T)
 overall_delay$mgmt_delay<-overall_delay$mgmt_year-overall_delay$Impact_year
 ##e.g. if fist damage cost is 1992 (impact year) and first management was 1985, we would get -7. 
 plot(overall_delay$mgmt_delay~overall_delay$Impact_year)
 hist(overall_delay$mgmt_delay)
 mean(overall_delay$mgmt_delay)
 summary(lm(overall_delay$mgmt_delay~overall_delay$Impact_year))
-
+write.csv(setNames(data.frame(cbind(overall_delay$code, overall_delay$Species, overall_delay$Impact_year, overall_delay$mgmt_year, overall_delay$mgmt_delay)), c("Country", "Species", "First Damage cost year", "First Management cost year", "Tau")), file="tau_by_spp_country.csv", row.names=F)
 concurvity(m)
 concurvity(m2)
 cor(cbind((combined4$Knowledge+1),log(combined4$pre_inv+1),log(combined4$post_inv+1),log(combined4$cum_species_fn1+1),log(combined4$tot_sr_fn1+1),log(combined4$imports+1),log(combined4$imports_historical+1),log(combined4$GDP.j+1),log(combined4$Pop.j+1),log(combined4$damage_ref+1)))
