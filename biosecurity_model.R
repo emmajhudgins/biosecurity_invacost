@@ -57,7 +57,7 @@ trade$imports<-as.numeric(trade$imports)
 trade_historical<-cbind(colSums(trade_historical), (trade$code)[1:92])
 colnames(trade_historical)<-c('imports_historical', 'code')
 trade_historical<-as.data.frame(trade_historical)
-trade_historical$imports<-as.numeric(trade_historical$imports)
+trade_historical$imports_historical<-as.numeric(trade_historical$imports_historical)
 
 
 ##calculate mean lag per country
